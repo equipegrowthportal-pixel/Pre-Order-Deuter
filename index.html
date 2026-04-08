@@ -549,27 +549,30 @@ function doLogin() {
   errEl.style.display = 'none';
   if (!email) { errEl.textContent = 'Por favor, informe seu e-mail.'; errEl.style.display = 'block'; return; }
 
-  const clients = getClients();
-  const client = clients.find(c => c.email === email);
+  // Sempre sincronizar do JSONBin antes de validar
+  const btn = document.querySelector('#login-form .btn-primary') || document.getElementById('btn-login');
+  if (btn) { btn.disabled = true; btn.textContent = 'Verificando...'; }
 
-  if (!client) {
-    errEl.textContent = 'E-mail não autorizado. Entre em contato com o time de compras.';
-    errEl.style.display = 'block';
-    return;
-  }
+  syncClientsFromRemote().finally(() => {
+    if (btn) { btn.disabled = false; btn.textContent = 'ENTRAR →'; }
+    const clients = getClients();
+    const client = clients.find(c => c.email === email);
 
-  // Authorized — check if already has profile filled
-  if (!client.name) {
-    // First access: show register form to complete profile
-    document.getElementById('login-form').style.display = 'none';
-    document.getElementById('register-form').style.display = 'block';
-    return;
-  }
+    if (!client) {
+      errEl.textContent = 'E-mail não autorizado. Entre em contato com o time de compras.';
+      errEl.style.display = 'block';
+      return;
+    }
 
-  // Already registered — load into session
-  currentUser = { name: client.name, company: client.company || '', email: client.email, phone: client.phone || '' };
-  client.lastAccess = new Date().toISOString();
-  saveClients(clients);
+    if (!client.name) {
+      document.getElementById('login-form').style.display = 'none';
+      document.getElementById('register-form').style.display = 'block';
+      return;
+    }
+
+    currentUser = { name: client.name, company: client.company || '', email: client.email, phone: client.phone || '' };
+    client.lastAccess = new Date().toISOString();
+    saveClients(clients);
 
   // Restore previous cart if exists
   const orders = getOrders();
@@ -583,7 +586,8 @@ function doLogin() {
     cart = {};
   }
 
-  launchCatalog();
+    launchCatalog();
+  }); // end finally
 }
 
 function completeRegister() {
