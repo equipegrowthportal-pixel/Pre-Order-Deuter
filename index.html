@@ -696,27 +696,7 @@ function downloadUpdatedHTML() {
       }).join('\n');
       let updated = originalHTML.replace(
         /const SEED = \[[\s\S]*?\];/,
-        `const SEED = [
-    {email:'gabriela@gruponautika.com.br',name:'Gabriela'},
-    {email:'leidiane.morais@gruponautika.com.br',name:'Leidiane Morais'},
-    {email:'tiago@gruponautika.com.br',name:'Tiago'},
-    {email:'bruna.andrade@gruponautika.com.br',name:'Bruna Andrade'},
-    {email:'camila.costa@gruponautika.com.br',name:'Camila Costa'},
-    {email:'henrique@gruponautika.com.br',name:'Henrique'},
-    {email:'jeniffer.silva@gruponautika.com.br',name:'Jeniffer Silva'},
-    {email:'mailaine@gruponautika.com.br',name:'Mailaine'},
-    {email:'renata.muniz@gruponautika.com.br',name:'Renata Muniz'},
-    {email:'ray@gruponautika.com.br',name:'Ray'},
-    {email:'kelma.anjos@gruponautika.com.br',name:'Kelma Anjos'},
-    {email:'vanessa.martins@gruponautika.com.br',name:'Vanessa Martins'},
-    {email:'mayara.santos@gruponautika.com.br',name:'Mayara Santos'},
-    {email:'victoria.sturaro@gruponautika.com.br',name:'Victoria Sturaro'},
-    {email:'katia.ferreira@gruponautika.com.br',name:'Katia Ferreira'},
-    {email:'allan.oliveira@gruponautika.com.br',name:'Allan Oliveira'},
-    {email:'peneto1971@gmail.com',name:'Peneto'},
-    {email:'gustavo.araujo@gruponautika.com.br',name:'intern'},
-    {email:'jhennifer.souza@gruponautika.com.br',name:'intern2'},
-  ];`
+        `const SEED = [\n${seedLines}\n  ];`
       );
 
       // 2. Garantir que abre na tela de login (view-info active, resto não)
@@ -1203,84 +1183,77 @@ function downloadOrderPDF(order) {
 // ═══════════════════════════════════════════════
 // BACKEND REMOTO — Google Apps Script
 // ═══════════════════════════════════════════════
-const JSONBIN_BIN_ID = '69d64fc4856a6821890f7cae';
 const JSONBIN_API_KEY = '$2a$10$4eCPwHBEGzJpLHL/3DMxPuypl9iKtoUi.TbhRtKvYIMgzMdD9Fr/a';
-const JSONBIN_URL = `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`;
+const JSONBIN_BIN_ORDERS = '69d64fc4856a6821890f7cae';
+const JSONBIN_BASE = 'https://api.jsonbin.io/v3/b';
 
 // ═══════════════════════════════════════════════
 // JSONBIN — CLIENTS SYNC
 // ═══════════════════════════════════════════════
+async function jsonbinGet(binId) {
+  const r = await fetch(`${JSONBIN_BASE}/${binId}/latest`, {
+    headers: { 'X-Master-Key': JSONBIN_API_KEY, 'X-Bin-Meta': 'false' }
+  });
+  if (!r.ok) throw new Error('GET failed: ' + r.status);
+  return await r.json();
+}
+
+async function jsonbinPut(binId, data) {
+  const r = await fetch(`${JSONBIN_BASE}/${binId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'X-Master-Key': JSONBIN_API_KEY },
+    body: JSON.stringify(data)
+  });
+  if (!r.ok) throw new Error('PUT failed: ' + r.status);
+  return await r.json();
+}
+
 async function saveClientsRemote(clients) {
   try {
-    const r = await fetch(JSONBIN_URL + '/latest', {
-      headers: { 'X-Master-Key': JSONBIN_API_KEY }
-    });
-    const d = await r.json();
-    const current = d.record || {};
-    await fetch(JSONBIN_URL, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'X-Master-Key': JSONBIN_API_KEY },
-      body: JSON.stringify({ ...current, clients })
-    });
+    const current = await jsonbinGet(JSONBIN_BIN_ORDERS);
+    const orders = Array.isArray(current.orders) ? current.orders : [];
+    await jsonbinPut(JSONBIN_BIN_ORDERS, { orders, clients });
+    console.log('✓ Clientes salvos no JSONBin:', clients.length);
   } catch(e) { console.warn('Erro ao salvar clientes remotos:', e); }
 }
 
 async function loadClientsRemote() {
   try {
-    const r = await fetch(JSONBIN_URL + '/latest', {
-      headers: { 'X-Master-Key': JSONBIN_API_KEY }
-    });
-    const d = await r.json();
-    return Array.isArray(d.record && d.record.clients) ? d.record.clients : null;
-  } catch(e) { return null; }
+    const data = await jsonbinGet(JSONBIN_BIN_ORDERS);
+    if (Array.isArray(data.clients) && data.clients.length > 0) return data.clients;
+    return null;
+  } catch(e) { console.warn('Erro ao carregar clientes:', e); return null; }
 }
 
 async function syncClientsFromRemote() {
   const remote = await loadClientsRemote();
   if (!remote || remote.length === 0) return;
-  // Mesclar: remoto prevalece, local complementa
   const local = getClients();
   const merged = [...remote];
   local.forEach(lc => {
     if (!merged.find(r => r.email === lc.email)) merged.push(lc);
   });
   saveClients(merged);
+  console.log('✓ Clientes sincronizados:', merged.length);
 }
 
 async function saveOrderRemote(order) {
   try {
-    // 1. Ler dados atuais
-    const getRes = await fetch(JSONBIN_URL + '/latest', {
-      headers: { 'X-Master-Key': JSONBIN_API_KEY }
-    });
-    const getData = await getRes.json();
-    const current = getData.record || {};
+    const current = await jsonbinGet(JSONBIN_BIN_ORDERS);
     const orders = Array.isArray(current.orders) ? current.orders : [];
-    // Substituir pedido existente do mesmo usuário ou adicionar novo
+    const clients = Array.isArray(current.clients) ? current.clients : [];
     const idx = orders.findIndex(o => o.user && o.user.email === order.user.email);
     if (idx >= 0) orders[idx] = order; else orders.push(order);
-    // 2. Salvar de volta
-    await fetch(JSONBIN_URL, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Master-Key': JSONBIN_API_KEY
-      },
-      body: JSON.stringify({ orders })
-    });
-    console.log('Pedido salvo remotamente:', order.user.email);
+    await jsonbinPut(JSONBIN_BIN_ORDERS, { orders, clients });
+    console.log('✓ Pedido salvo remotamente:', order.user.email);
   } catch(e) { console.warn('Erro ao salvar pedido remoto:', e); }
 }
 
 async function loadOrdersRemote() {
   try {
-    const r = await fetch(JSONBIN_URL + '/latest', {
-      headers: { 'X-Master-Key': JSONBIN_API_KEY }
-    });
-    const d = await r.json();
-    const orders = d.record && Array.isArray(d.record.orders) ? d.record.orders : null;
-    return orders;
-  } catch(e) { console.warn('Erro ao carregar pedidos remotos:', e); return null; }
+    const data = await jsonbinGet(JSONBIN_BIN_ORDERS);
+    return Array.isArray(data.orders) ? data.orders : null;
+  } catch(e) { console.warn('Erro ao carregar pedidos:', e); return null; }
 }
 
 function submitOrder() {
