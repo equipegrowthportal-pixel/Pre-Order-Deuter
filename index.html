@@ -982,21 +982,52 @@ function showView(name) {
 }
 
 function renderCartView() {
-  // Recarregar pedido salvo apenas se carrinho vazio E não foi esvaziado manualmente
-  const wasCleared = cartManuallyCleared || sessionStorage.getItem('deuter_cart_cleared') === '1';
-  if (!wasCleared && Object.keys(cart).filter(k => cart[k] > 0).length === 0 && currentUser) {
-    const orders = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-    const lastOrder = orders.filter(o => o.user && o.user.email === currentUser.email).slice(-1)[0];
-    if (lastOrder) {
-      lastOrder.items.forEach(item => {
-        cart[`${item.cardId}_${item.size}`] = item.qty;
-      });
-      updateCartCount();
-    }
-  }
   cartManuallyCleared = false;
   const items = getCartItems();
   const content = document.getElementById('cart-content');
+
+  // Se carrinho vazio, mostrar histórico de pedidos anteriores
+  if (items.length === 0 && !sessionStorage.getItem('deuter_cart_cleared')) {
+    const orders = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    const myOrders = orders.filter(o => o.user && currentUser && o.user.email === currentUser.email);
+    if (myOrders.length > 0) {
+      const histHtml = myOrders.map((o, i) => {
+        const dt = new Date(o.timestamp).toLocaleString('pt-BR');
+        const rows = o.items.map(item => `<tr>
+          <td><strong>${item.name}</strong></td>
+          <td>${item.colorway}</td>
+          <td>${item.size}</td>
+          <td style="font-family:monospace;font-size:11px">${item.styleNo}</td>
+          <td style="text-align:center">${item.qty}</td>
+        </tr>`).join('');
+        return `<div style="margin-bottom:24px;border:1px solid var(--border);border-radius:8px;overflow:hidden">
+          <div style="background:var(--mid);padding:10px 16px;display:flex;justify-content:space-between;align-items:center">
+            <span style="font-weight:600;font-size:13px">Pedido ${i+1} <span style="color:var(--muted);font-weight:400;font-size:11px">— ${dt}</span></span>
+            <span style="font-size:12px;color:var(--green)">${o.totalQty} unidades</span>
+          </div>
+          <table class="cart-table" style="margin:0">
+            <thead><tr><th>Produto</th><th>Cor</th><th>Tamanho</th><th>GTIN</th><th>Qtd</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>`;
+      }).join('');
+      content.innerHTML = `
+        <h3 style="margin-bottom:16px;font-size:16px;color:var(--muted)">Seus pedidos anteriores</h3>
+        ${histHtml}
+        <div style="display:flex;gap:12px;margin-top:16px;flex-wrap:wrap">
+          <button class="btn-back" onclick="showView('catalog')">+ Fazer novo pedido</button>
+          <button class="btn-back" onclick="downloadAllOrdersPDF()" style="border-color:var(--amber);color:var(--amber)">⬇ Baixar PDF completo</button>
+        </div>`;
+      return;
+    }
+    content.innerHTML = `
+      <div class="cart-empty">
+        <p style="font-size:48px;margin-bottom:16px">🛒</p>
+        <p>Seu pedido está vazio. <a href="#" onclick="showView('catalog');return false" style="color:var(--red)">Voltar ao catálogo</a></p>
+      </div>`;
+    return;
+  }
+
   if (items.length === 0) {
     content.innerHTML = `
       <div class="cart-empty">
@@ -1246,7 +1277,8 @@ async function saveOrderRemote(order) {
     const current = await jsonbinGet(JSONBIN_BIN_ORDERS);
     const orders = Array.isArray(current.orders) ? current.orders : [];
     const clients = Array.isArray(current.clients) ? current.clients : [];
-    const idx = orders.findIndex(o => o.user && o.user.email === order.user.email);
+    // Adicionar novo pedido sem substituir anteriores (múltiplos por usuário)
+    const idx = orders.findIndex(o => o.id === order.id);
     if (idx >= 0) orders[idx] = order; else orders.push(order);
     await jsonbinPut(JSONBIN_BIN_ORDERS, { orders, clients });
     console.log('✓ Pedido salvo remotamente:', order.user.email);
@@ -1283,9 +1315,8 @@ function submitOrder() {
     totalQty: items.reduce((a,b) => a+b.qty, 0)
   };
 
-  // Salvar local
+  // Salvar local — adiciona novo pedido sem apagar anteriores
   let existing = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-  existing = existing.filter(o => o.user.email !== currentUser.email);
   existing.push(order);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(existing));
 
@@ -1311,9 +1342,10 @@ function renderAdmin() {
       if (remote && remote.length > 0) {
         // Mescla com locais (remoto prevalece)
         const local = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        // Mesclar todos os pedidos (múltiplos por usuário permitidos)
         const merged = [...remote];
         local.forEach(lo => {
-          if (!merged.find(r => r.user.email === lo.user.email)) merged.push(lo);
+          if (!merged.find(r => r.id === lo.id)) merged.push(lo);
         });
         localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
       }
@@ -1453,17 +1485,29 @@ function cartRemoveItem(cartKey) {
 // SHOW ORDER SUMMARY (after submit)
 // ═══════════════════════════════════════════════
 function showOrderSummary() {
-  // Reload last saved order into cart view (read-only)
-  const orders = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-  const lastOrder = orders.filter(o => o.user && currentUser && o.user.email === currentUser.email).slice(-1)[0];
-  if (lastOrder) {
-    cart = {};
-    lastOrder.items.forEach(item => {
-      cart[`${item.cardId}_${item.size}`] = item.qty;
-    });
-    updateCartCount();
-  }
+  sessionStorage.removeItem('deuter_cart_cleared');
+  cart = {};
+  updateCartCount();
   showView('cart');
+}
+
+function downloadAllOrdersPDF() {
+  const orders = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+  const myOrders = orders.filter(o => o.user && currentUser && o.user.email === currentUser.email);
+  if (!myOrders.length) { alert('Nenhum pedido encontrado.'); return; }
+  // Merge all orders into one PDF
+  const merged = { ...myOrders[myOrders.length-1], items: [] };
+  const itemMap = {};
+  myOrders.forEach(o => {
+    o.items.forEach(item => {
+      const key = `${item.styleNo}_${item.colorway}_${item.size}`;
+      if (itemMap[key]) itemMap[key].qty += item.qty;
+      else itemMap[key] = { ...item };
+    });
+  });
+  merged.items = Object.values(itemMap);
+  merged.totalQty = merged.items.reduce((a,b) => a+b.qty, 0);
+  downloadOrderPDF(merged);
 }
 
 // ═══════════════════════════════════════════════
