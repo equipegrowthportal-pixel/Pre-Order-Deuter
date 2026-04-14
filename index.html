@@ -574,18 +574,8 @@ function doLogin() {
     client.lastAccess = new Date().toISOString();
     saveClients(clients);
 
-  // Restore previous cart if exists
-  const orders = getOrders();
-  const prevOrder = orders.filter(o => o.user.email === email).slice(-1)[0];
-  if (prevOrder) {
+    // Carrinho sempre começa vazio — pedidos já confirmados ficam no histórico (somente leitura)
     cart = {};
-    prevOrder.items.forEach(item => {
-      cart[`${item.cardId}_${item.size}`] = item.qty;
-    });
-  } else {
-    cart = {};
-  }
-
     launchCatalog();
   }); // end finally
 }
@@ -986,10 +976,37 @@ function renderCartView() {
   const items = getCartItems();
   const content = document.getElementById('cart-content');
 
-  // Se carrinho vazio, mostrar histórico de pedidos anteriores
+  // Se carrinho vazio, mostrar histórico (sincronizando do servidor primeiro)
   if (items.length === 0 && !sessionStorage.getItem('deuter_cart_cleared')) {
-    const orders = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-    const myOrders = orders.filter(o => o.user && currentUser && o.user.email === currentUser.email);
+    loadOrdersRemote().then(remote => {
+      if (remote) {
+        // Substituir local pelo remoto (que já reflete exclusões do admin)
+        const local = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        // Manter só pedidos que ainda existem no remoto + novos locais ainda não enviados
+        const remoteIds = new Set(remote.map(r => String(r.id)));
+        const localOnly = local.filter(lo => !remoteIds.has(String(lo.id)));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify([...remote, ...localOnly]));
+      }
+      _showCartHistory();
+    }).catch(() => _showCartHistory());
+    return;
+  }
+  if (items.length === 0) {
+    content.innerHTML = `
+      <div class="cart-empty">
+        <p style="font-size:48px;margin-bottom:16px">🛒</p>
+        <p>Seu pedido está vazio. <a href="#" onclick="showView('catalog');return false" style="color:var(--red)">Voltar ao catálogo</a></p>
+      </div>`;
+    return;
+  }
+  _showCartActive(items, content);
+}
+
+function _showCartHistory() {
+  const content = document.getElementById('cart-content');
+  if (!content) return;
+  const orders = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+  const myOrders = orders.filter(o => o.user && currentUser && o.user.email === currentUser.email);
     if (myOrders.length > 0) {
       const histHtml = myOrders.map((o, i) => {
         const dt = new Date(o.timestamp).toLocaleString('pt-BR');
@@ -1028,17 +1045,9 @@ function renderCartView() {
         <p style="font-size:48px;margin-bottom:16px">🛒</p>
         <p>Seu pedido está vazio. <a href="#" onclick="showView('catalog');return false" style="color:var(--red)">Voltar ao catálogo</a></p>
       </div>`;
-    return;
-  }
+}
 
-  if (items.length === 0) {
-    content.innerHTML = `
-      <div class="cart-empty">
-        <p style="font-size:48px;margin-bottom:16px">🛒</p>
-        <p>Seu pedido está vazio. <a href="#" onclick="showView('catalog');return false" style="color:var(--red)">Voltar ao catálogo</a></p>
-      </div>`;
-    return;
-  }
+function _showCartActive(items, content) {
   let totalUsd = 0;
   let totalBrl = 0;
   const locked = isDeadlinePassed();
@@ -1339,6 +1348,13 @@ function submitOrder() {
 
   cart = {};
   updateCartCount();
+  // Zerar badges e quantidades no catálogo
+  document.querySelectorAll('.product-card').forEach(card => {
+    card.classList.remove('has-order');
+    const tag = card.querySelector('.card-order-tag');
+    if (tag) tag.remove();
+    card.querySelectorAll('.qty-input').forEach(inp => inp.value = 0);
+  });
   showView('success');
 }
 
@@ -1509,8 +1525,19 @@ async function clientDeleteOrder(orderId) {
     await jsonbinPut(JSONBIN_BIN_ORDERS, { orders, clients });
   } catch(e) { console.warn('Erro ao excluir no servidor:', e); }
   // Remover local
-  const local = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]').filter(o => String(o.id) !== String(orderId));
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(local));
+  const allLocal = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+  const deleted = allLocal.find(o => String(o.id) === String(orderId));
+  const remaining = allLocal.filter(o => String(o.id) !== String(orderId));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(remaining));
+  // Zerar cart e badges/qtds dos itens do pedido excluído
+  cart = {};
+  updateCartCount();
+  document.querySelectorAll('.product-card').forEach(card => {
+    card.classList.remove('has-order');
+    const tag = card.querySelector('.card-order-tag');
+    if (tag) tag.remove();
+    card.querySelectorAll('.qty-input').forEach(inp => inp.value = 0);
+  });
   sessionStorage.removeItem('deuter_cart_cleared');
   renderCartView();
 }
