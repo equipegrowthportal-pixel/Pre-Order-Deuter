@@ -200,7 +200,7 @@
 <header>
   <div class="logo">DEUTER <span>FW26/27</span></div>
   <div class="header-right">
-    <span class="badge-deadline">Prazo: 17/04/2026</span>
+    <span class="badge-deadline">Prazo: 21/04/2026</span>
     <button class="btn-admin" onclick="showAdminLogin()">Admin</button>
     <button class="btn-admin" id="logout-btn" style="display:none" onclick="doLogout()">Sair</button>
     <button class="cart-btn" onclick="showView('cart')" id="cart-btn" style="display:none">
@@ -214,7 +214,7 @@
   <div style="max-width:480px;margin:80px auto;padding:0 24px">
     <div class="info-card">
       <h2>Pré-Pedido<br>FW 26/27</h2>
-      <p style="margin-bottom:28px">Selecione os produtos Deuter que deseja ter em sua loja! O pedido será analisado e confirmado pelo time de compras. <strong>Prazo para preenchimento: 17 de abril de 2026.</strong></p>
+      <p style="margin-bottom:28px">Selecione os produtos Deuter que deseja ter em sua loja! O pedido será analisado e confirmado pelo time de compras. <strong>Prazo para preenchimento: 21 de abril de 2026.</strong></p>
       <div id="login-form">
         <div class="form-group">
           <label>Seu E-mail</label>
@@ -424,7 +424,7 @@ let filteredCards = [...allCards];
 const ADMIN_PASS = 'deuter2026';
 const STORAGE_KEY = 'deuter_orders_fw2627';
 const CLIENTS_KEY = 'deuter_clients_fw2627';
-const DEADLINE = new Date('2026-04-17T23:59:59');
+const DEADLINE = new Date('2026-04-21T23:59:59');
 const isDeadlinePassed = () => new Date() > DEADLINE;
 
 // ═══════════════════════════════════════════════
@@ -633,7 +633,7 @@ function launchCatalog() {
     const bar = document.querySelector('.rate-bar');
     if (bar) {
       bar.style.borderColor = '#553';
-      bar.querySelector('.rate-note').innerHTML += '<br><strong style="color:#ffaa00">⏰ Prazo encerrado em 17/04/2026 — pedido em modo somente leitura.</strong>';
+      bar.querySelector('.rate-note').innerHTML += '<br><strong style="color:#ffaa00">⏰ Prazo encerrado em 21/04/2026 — pedido em modo somente leitura.</strong>';
     }
   }
   showView('catalog');
@@ -1215,7 +1215,7 @@ function downloadOrderPDF(order) {
       ${total > 0 ? `<div style="text-align:right"><div class="total-label">Total estimado</div><div class="total-value">R$ ${total.toFixed(2)}</div></div>` : ''}
     </div>
     <div class="footer">⚠ Preços estimados e sujeitos a alteração. Valores finais confirmados no fechamento do pedido.<br>
-    Itens importados — previsão de chegada: aproximadamente 06 meses. | Prazo do pré-pedido: 17/04/2026</div>
+    Itens importados — previsão de chegada: aproximadamente 06 meses. | Prazo do pré-pedido: 21/04/2026</div>
     <script>window.onload = function(){ window.print(); }<\/script>
     </body></html>`;
 
