@@ -574,17 +574,8 @@ function doLogin() {
     client.lastAccess = new Date().toISOString();
     saveClients(clients);
 
-  // Restore previous cart if exists
-  const orders = getOrders();
-  const prevOrder = orders.filter(o => o.user.email === email).slice(-1)[0];
-  if (prevOrder) {
-    cart = {};
-    prevOrder.items.forEach(item => {
-      cart[`${item.cardId}_${item.size}`] = item.qty;
-    });
-  } else {
-    cart = {};
-  }
+  // Não restaurar carrinho — pedidos confirmados ficam no histórico (somente leitura)
+  cart = {};
 
     launchCatalog();
   }); // end finally
@@ -988,7 +979,25 @@ function renderCartView() {
 
   // Se carrinho vazio, mostrar histórico de pedidos anteriores
   if (items.length === 0 && !sessionStorage.getItem('deuter_cart_cleared')) {
-    const orders = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    // Sincronizar pedidos do servidor antes de mostrar histórico
+    loadOrdersRemote().then(remote => {
+      if (remote) {
+        const local = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        const merged = [...remote];
+        local.forEach(lo => { if (!merged.find(r => r.id === lo.id)) merged.push(lo); });
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+      }
+      _renderCartHistory();
+    }).catch(() => _renderCartHistory());
+    return;
+  }
+  _renderCartActive(items);
+}
+
+function _renderCartHistory() {
+  const content = document.getElementById('cart-content');
+  if (!content) return;
+  const orders = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
     const myOrders = orders.filter(o => o.user && currentUser && o.user.email === currentUser.email);
     if (myOrders.length > 0) {
       const histHtml = myOrders.map((o, i) => {
@@ -1031,6 +1040,13 @@ function renderCartView() {
     return;
   }
 
+  // fallthrough to _renderCartActive (should not happen, but safety net)
+  _renderCartActive(getCartItems());
+}
+
+function _renderCartActive(items) {
+  const content = document.getElementById('cart-content');
+  if (!content) return;
   if (items.length === 0) {
     content.innerHTML = `
       <div class="cart-empty">
@@ -1511,6 +1527,15 @@ async function clientDeleteOrder(orderId) {
   // Remover local
   const local = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]').filter(o => String(o.id) !== String(orderId));
   localStorage.setItem(STORAGE_KEY, JSON.stringify(local));
+  // Zerar carrinho e badges dos cards
+  cart = {};
+  updateCartCount();
+  document.querySelectorAll('.product-card').forEach(card => {
+    card.classList.remove('has-order');
+    const tag = card.querySelector('.card-order-tag');
+    if (tag) tag.remove();
+    card.querySelectorAll('.qty-input').forEach(inp => inp.value = 0);
+  });
   sessionStorage.removeItem('deuter_cart_cleared');
   renderCartView();
 }
