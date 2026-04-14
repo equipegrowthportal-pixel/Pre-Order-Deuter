@@ -1137,7 +1137,12 @@ function downloadOrderPDF(order) {
     let total = 0;
     let totalQty = 0;
     const rowsHtml = order.items.map((item, i) => {
-      const brl = (item.fob || item.priceUsd) ? ((item.fob || item.priceUsd) * (order.usdMultiplier || 18) * item.qty) : null;
+      // Buscar fob do item salvo, ou do catálogo como fallback
+      const cardFob = item.fob || (() => {
+        const c = allCards.find(c => c.gtin === item.styleNo || c.styleNo === item.styleNo || c.id === item.cardId);
+        return c ? c.fob : null;
+      })();
+      const brl = cardFob ? (cardFob * (order.usdMultiplier || 18) * item.qty) : null;
       if (brl) total += brl;
       totalQty += item.qty;
       return `<tr>
