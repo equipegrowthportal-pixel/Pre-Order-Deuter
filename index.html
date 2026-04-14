@@ -977,9 +977,14 @@ function renderCartView() {
   const items = getCartItems();
   const content = document.getElementById('cart-content');
 
-  // Se carrinho vazio, mostrar histórico de pedidos anteriores
-  if (items.length === 0 && !sessionStorage.getItem('deuter_cart_cleared')) {
-    // Sincronizar pedidos do servidor antes de mostrar histórico
+  // Se carrinho tem itens, mostrar carrinho ativo para edição/confirmação
+  if (items.length > 0) {
+    _renderCartActive(items);
+    return;
+  }
+
+  // Carrinho vazio — mostrar histórico sincronizando do servidor primeiro
+  if (!sessionStorage.getItem('deuter_cart_cleared')) {
     loadOrdersRemote().then(remote => {
       if (remote) {
         const local = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
@@ -989,73 +994,63 @@ function renderCartView() {
       }
       _renderCartHistory();
     }).catch(() => _renderCartHistory());
-    return;
+  } else {
+    content.innerHTML = `
+      <div class="cart-empty">
+        <p style="font-size:48px;margin-bottom:16px">🛒</p>
+        <p>Seu pedido está vazio. <a href="#" onclick="showView('catalog');return false" style="color:var(--red)">Voltar ao catálogo</a></p>
+      </div>`;
   }
-  _renderCartActive(items);
 }
 
 function _renderCartHistory() {
   const content = document.getElementById('cart-content');
   if (!content) return;
   const orders = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-    const myOrders = orders.filter(o => o.user && currentUser && o.user.email === currentUser.email);
-    if (myOrders.length > 0) {
-      const histHtml = myOrders.map((o, i) => {
-        const dt = new Date(o.timestamp).toLocaleString('pt-BR');
-        const rows = o.items.map(item => `<tr>
-          <td><strong>${item.name}</strong></td>
-          <td>${item.colorway}</td>
-          <td>${item.size}</td>
-          <td style="font-family:monospace;font-size:11px">${item.styleNo}</td>
-          <td style="text-align:center">${item.qty}</td>
-        </tr>`).join('');
-        return `<div style="margin-bottom:24px;border:1px solid var(--border);border-radius:8px;overflow:hidden">
-          <div style="background:var(--mid);padding:10px 16px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
-            <span style="font-weight:600;font-size:13px">Pedido ${i+1} <span style="color:var(--muted);font-weight:400;font-size:11px">— ${dt}</span> <span style="font-family:monospace;font-size:11px;color:var(--muted)">#${String(o.id).slice(-6)}</span></span>
-            <div style="display:flex;gap:8px;align-items:center">
-              <span style="font-size:12px;color:var(--green)">${o.totalQty} unidades</span>
-              <button onclick="clientDeleteOrder('${o.id}')" style="background:transparent;border:1px solid #553;color:#f87171;font-size:11px;padding:3px 10px;border-radius:4px;cursor:pointer">✕ Excluir este pedido</button>
-            </div>
+  const myOrders = orders.filter(o => o.user && currentUser && o.user.email === currentUser.email);
+  if (myOrders.length > 0) {
+    const histHtml = myOrders.map((o, i) => {
+      const dt = new Date(o.timestamp).toLocaleString('pt-BR');
+      const rows = o.items.map(item => `<tr>
+        <td><strong>${item.name}</strong></td>
+        <td>${item.colorway}</td>
+        <td>${item.size}</td>
+        <td style="font-family:monospace;font-size:11px">${item.styleNo}</td>
+        <td style="text-align:center">${item.qty}</td>
+      </tr>`).join('');
+      return `<div style="margin-bottom:24px;border:1px solid var(--border);border-radius:8px;overflow:hidden">
+        <div style="background:var(--mid);padding:10px 16px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+          <span style="font-weight:600;font-size:13px">Pedido ${i+1} <span style="color:var(--muted);font-weight:400;font-size:11px">— ${dt}</span> <span style="font-family:monospace;font-size:11px;color:var(--muted)">#${String(o.id).slice(-6)}</span></span>
+          <div style="display:flex;gap:8px;align-items:center">
+            <span style="font-size:12px;color:var(--green)">${o.totalQty} unidades</span>
+            <button onclick="clientDeleteOrder('${o.id}')" style="background:transparent;border:1px solid #553;color:#f87171;font-size:11px;padding:3px 10px;border-radius:4px;cursor:pointer">✕ Excluir</button>
           </div>
-          <table class="cart-table" style="margin:0">
-            <thead><tr><th>Produto</th><th>Cor</th><th>Tamanho</th><th>GTIN</th><th>Qtd</th></tr></thead>
-            <tbody>${rows}</tbody>
-          </table>
-        </div>`;
-      }).join('');
-      content.innerHTML = `
-        <h3 style="margin-bottom:16px;font-size:16px;color:var(--muted)">Seus pedidos anteriores</h3>
-        ${histHtml}
-        <div style="display:flex;gap:12px;margin-top:16px;flex-wrap:wrap">
-          <button class="btn-back" onclick="showView('catalog')">+ Fazer novo pedido</button>
-          <button class="btn-back" onclick="downloadAllOrdersPDF()" style="border-color:var(--amber);color:var(--amber)">⬇ Baixar PDF completo</button>
-        </div>`;
-      return;
-    }
+        </div>
+        <table class="cart-table" style="margin:0">
+          <thead><tr><th>Produto</th><th>Cor</th><th>Tamanho</th><th>GTIN</th><th>Qtd</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+    }).join('');
     content.innerHTML = `
-      <div class="cart-empty">
-        <p style="font-size:48px;margin-bottom:16px">🛒</p>
-        <p>Seu pedido está vazio. <a href="#" onclick="showView('catalog');return false" style="color:var(--red)">Voltar ao catálogo</a></p>
+      <h3 style="margin-bottom:16px;font-size:16px;color:var(--muted)">Seus pedidos anteriores</h3>
+      ${histHtml}
+      <div style="display:flex;gap:12px;margin-top:16px;flex-wrap:wrap">
+        <button class="btn-back" onclick="showView('catalog')">+ Fazer novo pedido</button>
+        <button class="btn-back" onclick="downloadAllOrdersPDF()" style="border-color:var(--amber);color:var(--amber)">⬇ Baixar PDF completo</button>
       </div>`;
     return;
   }
-
-  // fallthrough to _renderCartActive (should not happen, but safety net)
-  _renderCartActive(getCartItems());
+  content.innerHTML = `
+    <div class="cart-empty">
+      <p style="font-size:48px;margin-bottom:16px">🛒</p>
+      <p>Seu pedido está vazio. <a href="#" onclick="showView('catalog');return false" style="color:var(--red)">Voltar ao catálogo</a></p>
+    </div>`;
 }
 
 function _renderCartActive(items) {
   const content = document.getElementById('cart-content');
   if (!content) return;
-  if (items.length === 0) {
-    content.innerHTML = `
-      <div class="cart-empty">
-        <p style="font-size:48px;margin-bottom:16px">🛒</p>
-        <p>Seu pedido está vazio. <a href="#" onclick="showView('catalog');return false" style="color:var(--red)">Voltar ao catálogo</a></p>
-      </div>`;
-    return;
-  }
-  let totalUsd = 0;
   let totalBrl = 0;
   const locked = isDeadlinePassed();
   const rows = items.map((item, i) => {
@@ -1081,7 +1076,6 @@ function _renderCartActive(items) {
       <td>${delBtn}</td>
     </tr>`;
   }).join('');
-
   content.innerHTML = `
     <table class="cart-table">
       <thead><tr><th>#</th><th>Produto</th><th>Cor</th><th>Tamanho</th><th>GTIN</th><th>Qtd</th><th>Preço Est. BRL</th><th></th></tr></thead>
