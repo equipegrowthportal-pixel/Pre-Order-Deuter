@@ -690,12 +690,56 @@ function downloadUpdatedHTML() {
       }).join('\n');
       let updated = originalHTML.replace(
         /const SEED = \[[\s\S]*?\];/,
-        `const SEED = [\n${seedLines}\n  ];`
+        `const SEED = [
+    {email:'gabriela@gruponautika.com.br',name:'Gabriela'},
+    {email:'leidiane.morais@gruponautika.com.br',name:'Leidiane Morais'},
+    {email:'tiago@gruponautika.com.br',name:'Tiago'},
+    {email:'bruna.andrade@gruponautika.com.br',name:'Bruna Andrade'},
+    {email:'camila.costa@gruponautika.com.br',name:'Camila Costa'},
+    {email:'henrique@gruponautika.com.br',name:'Henrique'},
+    {email:'jeniffer.silva@gruponautika.com.br',name:'Jeniffer Silva'},
+    {email:'mailaine@gruponautika.com.br',name:'Mailaine'},
+    {email:'renata.muniz@gruponautika.com.br',name:'Renata Muniz'},
+    {email:'ray@gruponautika.com.br',name:'Ray'},
+    {email:'kelma.anjos@gruponautika.com.br',name:'Kelma Anjos'},
+    {email:'vanessa.martins@gruponautika.com.br',name:'Vanessa Martins'},
+    {email:'mayara.santos@gruponautika.com.br',name:'Mayara Santos'},
+    {email:'victoria.sturaro@gruponautika.com.br',name:'Victoria Sturaro'},
+    {email:'katia.ferreira@gruponautika.com.br',name:'Katia Ferreira'},
+    {email:'allan.oliveira@gruponautika.com.br',name:'Allan Oliveira'},
+    {email:'peneto1971@gmail.com',name:'Peneto'},
+    {email:'vendas.kominek@gmail.com',name:'Kominek repres'},
+    {email:'compras@mdcgroup.com.br',name:'MDC Group'},
+    {email:'dispropilextreme@hotmail.com',name:'DISPROPIL'},
+    {email:'viviane.niepsui@acampar.com.br',name:'ACAMPAR'},
+    {email:'acampar@acampar.com.br',name:'ACAMPAR'},
+    {email:'contato@casadomontanhista.com.br',name:'CASA DO MONTANHISTA'},
+    {email:'dispropilmga@gmail.com',name:'DISPROPIL'},
+    {email:'viniciusnormandia@gmail.com',name:'Vinicius Normandia'},
+    {email:'pablo@proadventure.com.br',name:'PABLO'},
+    {email:'hilton@altamontanha.com',name:'ALTA MONTANHA'},
+    {email:'compras@extremeoutdoor.com.br',name:'EXTREME OUTDOOR'},
+    {email:'lojacanyon@gmail.com',name:'CANYON'},
+    {email:'contato@terratop.com.br',name:'TERRA TOP'},
+    {email:'contatovivecense@gmail.com',name:'contatovivecense'},
+    {email:'comercial@papasiri.com',name:'comercial'},
+    {email:'contato@papasiri.com',name:'contato'},
+    {email:'yoiti@bivak.com.br',name:'BIVAK'},
+    {email:'bruno.callegaro@gruponautika.com.br',name:'Supply'},
+    {email:'import@gruponautika.com.br',name:'Importação'},
+    {email:'christian.lechelmayr@deuter.com',name:'Deuter GER'},
+    {email:'contato@lojapedepato.com.br',name:'LOJA DE PATO'},
+    {email:'marcelo@lojasafari.com.br',name:'LOJA SAFARI'},
+    {email:'ecoxoutdoor@gmail.com',name:'ECOX OUTDOOR'},
+    {email:'compras@pescacompleta.com.br',name:'HAKKEN'},
+    {email:'junior@ebertrepresentacoes.com.br',name:'EBERT REPRE'},
+    {email:'guilherme.braziel@gruponautika.com.br',name:'MKT'},
+  ];`
       );
 
       // 2. Garantir que abre na tela de login (view-info active, resto não)
-      updated = updated.replace(/class="view active"/g, 'class="view"');
-      updated = updated.replace(/class="view" id="view-info"/, 'class="view active" id="view-info"');
+      updated = updated.replace(/class="view"/g, 'class="view"');
+      updated = updated.replace(/class="view" id="view-info"/, 'class="view" id="view-info"');
 
       // 3. Download
       const blob = new Blob([updated], { type: 'text/html' });
